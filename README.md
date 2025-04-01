@@ -1,6 +1,8 @@
 # Hellsreach-lab
 
-Welcome to my homelab repository! This space documents the design, infrastructure, and automation workflows behind my personal lab environment. I built this homelab to deepen my understanding of enterprise-level technologies, network security, container orchestration, and CI/CD pipeline automation.
+Welcome to my homelab repository! 
+
+This space documents the design, infrastructure, and automation workflows behind my personal lab environment. I built this homelab to deepen my understanding of enterprise-level technologies, network security, container orchestration, and CI/CD pipeline automation.
 
 Core Objectives
 
@@ -39,7 +41,7 @@ WAPS VLAN: Segregated VLAN for wireless access points
 
 Cameras VLAN: Dedicated network for IP surveillance devices
 
-IoT VLAN: Isolated for smart home and IoT devices, minimizing external access
+IoT VLAN: Isolated for smart home and IoT devices, restricting local access
 
 
 
@@ -49,13 +51,15 @@ IoT VLAN: Isolated for smart home and IoT devices, minimizing external access
 
 Current Infrastructure
 
-File Server: Dell PowerEdge R710 with TrueNAS Scale
+Truenas Scale & Windows 2022
 
-Study Server: Dell PowerEdge R610 for VM and automation testing
+File Server: Dell PowerEdge R710. File server with a windows domain controller.
+
+Study Server: Dell PowerEdge R610 for automation testing and CCNP research
 
 Minecraft Server: Fabric-based server managed with Portainer
 
-Offline Storage: Dell NX400 for offline storage and cold backups
+*Decommissioned*Offline Storage: Dell NX400 for offline storage and cold backups
 
 DNS Server: Lenovo m710q, ensuring internal name resolution
 
@@ -74,13 +78,9 @@ TrueNAS Scale: Manages file services and local storage
 
 🎮 VR and Gaming
 
-HTC Vive Setup: Wireless VR streaming and gaming
-
 Minecraft Fabric Server: Hosting and managing modded dimensions across physical servers
 
-Meta Quest Automation: Automated APK/OBB deployment pipelines using ADB and OVR tools
-
-
+Meta Quest Automation: Building and research for automated APK/OBB deployment pipelines using ADB and OVR tools
 
 ---
 
@@ -106,8 +106,6 @@ Pi-Based Applications: Exploring the potential of Pi-based AI and IoT applicatio
 AI-Enhanced Log Analysis: Implementing machine learning models to identify and predict system anomalies.
 
 Dynamic DNS and Security Rules: Automated DNS updates and security policy management.
-
-
 
 ---
 
@@ -138,9 +136,12 @@ Gain Cloud and Infrastructure Proficiency: Explore hybrid cloud solutions, conta
 
 Certifications and Career Aspirations
 
-Current Certifications: CCNP, PRINCE2
+Current Certifications: CCNA, Diploma I.T Administration
 
-Future Goals: Enhance DevOps expertise, explore Terraform and GitLab for managing infrastructure as code, and contribute to open-source projects related to automation and monitoring.
+Future Goals: CCNP, possibly PRINCE2
+
+Other goal:
+Enhance DevOps expertise, explore Terraform and GitLab for managing infrastructure as code, and contribute to open-source projects related to automation and monitoring.
 
 
 
