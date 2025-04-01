@@ -1,0 +1,50 @@
+import os
+import re
+
+def extract_from_files(folder_path, file_filter="*.log", regex_pattern=None):
+    if regex_pattern is None:
+        regex_pattern = r"(\d{4}-\d{2}-\d{2}).+?([\w\.-]+@[\w\.-]+\.\w+)"
+
+    # Compile the regex pattern for performance
+    pattern = re.compile(regex_pattern)
+
+    # Check for wildcard or exact filename
+    use_wildcard = "*" in file_filter
+
+    results = []
+
+    for file in os.listdir(folder_path):
+        if use_wildcard:
+            if not file.endswith(file_filter.strip("*")):
+                continue
+        else:
+            if file != file_filter:
+                continue
+
+        file_path = os.path.join(folder_path, file)
+
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line_number, line in enumerate(f, start=1):
+                    match = pattern.search(line)
+                    if match:
+                        results.append({
+                            "file": file,
+                            "line": line_number,
+                            "match": match.groups()
+                        })
+
+        except Exception as e:
+            print(f"Error reading file {file_path}: {e}")
+
+    return results
+
+# Example usage
+folder = r"C:\Path\To\Folder"
+file_filter = "*.log"  # Could also be "specificfile.txt"
+regex = r"(\d{4}-\d{2}-\d{2}).+?([\w\.-]+@[\w\.-]+\.\w+)"
+
+matches = extract_from_files(folder, file_filter, regex)
+
+for item in matches:
+    print(f"File: {item['file']} | Line: {item['line']} | Match: {item['match']}")
