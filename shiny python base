@@ -1,0 +1,58 @@
+# app.py
+
+"""
+Shiny Dashboard Skeleton for Python
+
+This script sets up a minimal Shiny dashboard using the `shiny` package.
+It includes:
+- All required library imports
+- A structured layout with a header and content area
+- Placeholder outputs for future dynamic or static content
+- Notes on where to place reactive logic, plots, or data
+
+To run this app:
+    1. Install shiny for Python: pip install shiny
+    2. Run using: python -m shiny run --reload app.py
+"""
+
+# ---- Required Libraries ----
+from shiny import App, ui, render, reactive
+import pandas as pd  # for future data handling
+import plotly.express as px  # optional for rich interactive charts
+import os  # for file operations if needed
+import datetime  # useful for timestamps
+
+# ---- User Interface ----
+app_ui = ui.page_fluid(
+    ui.panel_title("My Shiny Dashboard"),
+    ui.layout_sidebar(
+        ui.panel_sidebar(
+            ui.h4("Sidebar"),
+            # Add inputs here (sliders, buttons, etc.)
+        ),
+        ui.panel_main(
+            ui.h3("Dashboard Output"),
+            ui.output_text("greeting"),
+            # ui.output_plot("plot_example")  # Placeholder for future plots
+        )
+    )
+)
+
+# ---- Server Logic ----
+def server(input, output, session):
+    
+    @output
+    @render.text
+    def greeting():
+        return f"Welcome! The time is {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+    # Example for future plot:
+    # @output
+    # @render.plot
+    # def plot_example():
+    #     df = pd.DataFrame({"x": range(10), "y": [i*i for i in range(10)]})
+    #     fig = px.line(df, x="x", y="y", title="Sample Plot")
+    #     return fig
+
+# ---- Launch the App ----
+app = App(app_ui, server)
