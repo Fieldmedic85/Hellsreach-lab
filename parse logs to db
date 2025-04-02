@@ -1,0 +1,55 @@
+# Requires: System.Data.SQLite.dll (or use Python for DB access after CSVs)
+# Install via: choco install sqlite or ensure sqlite3.exe is in your path
+
+$logFile = "C:\Path\To\latest_log.csv"
+$dbFile = "C:\Path\To\logs.db"
+
+# Temporary CSVs per pattern (will import to DB after)
+$tempDir = "C:\Path\To\temp_csv"
+New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+
+$pattern1_csv = "$tempDir\pattern1.csv"
+$pattern2_csv = "$tempDir\pattern2.csv"
+$pattern3_csv = "$tempDir\pattern3.csv"
+$pattern4_csv = "$tempDir\pattern4.csv"
+
+# Headers (customise to match fields extracted)
+"StartTime,EndTime,Module,Macro,Object,Message,Status,ProcessName,MessageId" | Out-File $pattern1_csv -Encoding UTF8
+"Time,Component,Status" | Out-File $pattern2_csv -Encoding UTF8
+"UID,Message,Result" | Out-File $pattern3_csv -Encoding UTF8
+"Timestamp,Level,Description" | Out-File $pattern4_csv -Encoding UTF8
+
+# Regex patterns
+$pattern1 = '<FACTS_Protocol><StartTime>(\d{14,17})</StartTime><EndTime>(\d{14,17})</EndTime><Module>(.*?)</Module><Macro>(.*?)</Macro><Object>(.*?)</Object><Message>(.*?)</Message><Status>(\d+)</Status><ProcessName>(.*?)</ProcessName><MessageId>(.*?)</MessageId></FACTS_Protocol>'
+$pattern2 = '<ALT_Protocol><Time>(\d{14})</Time><Component>(.*?)</Component><Status>(.*?)</Status></ALT_Protocol>'
+$pattern3 = '<Data><UID>(.*?)</UID><Message>(.*?)</Message><Result>(.*?)</Result></Data>'
+$pattern4 = '<Log><Timestamp>(.*?)</Timestamp><Level>(.*?)</Level><Description>(.*?)</Description></Log>'
+
+Get-Content $logFile -Encoding UTF8 | ForEach-Object {
+    $line = $_.Trim()
+
+    if ($line -match $pattern1) {
+        $m = [regex]::Match($line, $pattern1)
+        "$($m.Groups[1]),$($m.Groups[2]),$($m.Groups[3]),$($m.Groups[4]),$($m.Groups[5]),$($m.Groups[6]),$($m.Groups[7]),$($m.Groups[8]),$($m.Groups[9])" |
+            Out-File $pattern1_csv -Append -Encoding UTF8
+    }
+    elseif ($line -match $pattern2) {
+        $m = [regex]::Match($line, $pattern2)
+        "$($m.Groups[1]),$($m.Groups[2]),$($m.Groups[3])" |
+            Out-File $pattern2_csv -Append -Encoding UTF8
+    }
+    elseif ($line -match $pattern3) {
+        $m = [regex]::Match($line, $pattern3)
+        "$($m.Groups[1]),$($m.Groups[2]),$($m.Groups[3])" |
+            Out-File $pattern3_csv -Append -Encoding UTF8
+    }
+    elseif ($line -match $pattern4) {
+        $m = [regex]::Match($line, $pattern4)
+        "$($m.Groups[1]),$($m.Groups[2]),$($m.Groups[3])" |
+            Out-File $pattern4_csv -Append -Encoding UTF8
+    }
+}
+
+# Now import the CSVs into a SQLite DB via Python (recommended)
+# You can call the below Python script from PowerShell if needed:
+# python import_to_sqlite.py
