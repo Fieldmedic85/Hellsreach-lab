@@ -1,118 +1,126 @@
-from shiny import App, ui, render, reactive
-import pandas as pd
-import sqlite3
-import matplotlib.pyplot as plt
-import os
+from shiny import App, ui, render, reactive, req import pandas as pd import sqlite3 import matplotlib.pyplot as plt import os import subprocess import platform from datetime import datetime
 
-DB_PATH = r"C:\Path\To\logs.db"  # update this path
+--- Configuration ---
 
-def get_data():
-    with sqlite3.connect(DB_PATH) as conn:
-        data = {
-            "pattern1": pd.read_sql("SELECT * FROM pattern1_entries", conn),
-            "pattern2": pd.read_sql("SELECT * FROM pattern2_entries", conn),
-            "pattern3": pd.read_sql("SELECT * FROM pattern3_entries", conn),
-            "pattern4": pd.read_sql("SELECT * FROM pattern4_entries", conn),
-        }
-    return data
+DB_PATH = r"C:\Path\To\logs.db" MONITOR_IPS = ["10.0.20.1", "10.0.10.6"]
 
-# App UI
-app_ui = ui.page_fluid(
-    ui.h2("Tecan Wallboard - Parsed Log Summary"),
-    ui.layout_columns(
-        ui.card(ui.h4("Pattern 1 Matches"), ui.output_text("count_pattern1")),
-        ui.card(ui.h4("Pattern 2 Matches"), ui.output_text("count_pattern2")),
-        ui.card(ui.h4("Pattern 3 Matches"), ui.output_text("count_pattern3")),
-        ui.card(ui.h4("Pattern 4 Matches"), ui.output_text("count_pattern4")),
-    ),
-    ui.hr(),
-    ui.output_plot("pattern1_timeline_plot"),
-    ui.hr(),
-    ui.navset_tab(
-        ui.nav_panel("Pattern 1 Table", ui.output_data_frame("table_pattern1")),
-        ui.nav_panel("Pattern 2 Table", ui.output_data_frame("table_pattern2")),
-        ui.nav_panel("Pattern 3 Table", ui.output_data_frame("table_pattern3")),
-        ui.nav_panel("Pattern 4 Table", ui.output_data_frame("table_pattern4")),
-    ),
-)
+--- Helper Functions ---
 
+def get_data(): with sqlite3.connect(DB_PATH) as conn: return { "pattern1": pd.read_sql("SELECT * FROM pattern1_entries", conn), "pattern2": pd.read_sql("SELECT * FROM pattern2_entries", conn), "pattern3": pd.read_sql("SELECT * FROM pattern3_entries", conn), "pattern4": pd.read_sql("SELECT * FROM pattern4_entries", conn), }
 
-# App logic
-def server(input, output, session):
-    @reactive.Calc
-    def data():
-        return get_data()
+def ping_host(ip): param = "-n" if platform.system().lower() == "windows" else "-c" try: result = subprocess.run([ "ping", param, "1", ip ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) return result.returncode == 0 except Exception: return False
 
-    @output
-    @render.text
-    def count_pattern1():
-        return str(len(data()["pattern1"]))
+--- UI ---
 
-    @output
-    @render.text
-    def count_pattern2():
-        return str(len(data()["pattern2"]))
+app_ui = ui.page_fluid( ui.h2("Tecan Wallboard - Parsed Log Dashboard"), ui.row( ui.input_date_range("date_range", "Filter by StartTime Range"), ui.input_select("process_filter", "Filter by Process Name", choices=[], selected=None), ), ui.row( ui.card(ui.output_ui("network_status_panel")) ), ui.hr(), ui.layout_columns( ui.card(ui.h4("Pattern 1 Matches"), ui.output_text("count_pattern1")), ui.card(ui.h4("Pattern 2 Matches"), ui.output_text("count_pattern2")), ui.card(ui.h4("Pattern 3 Matches"), ui.output_text("count_pattern3")), ui.card(ui.h4("Pattern 4 Matches"), ui.output_text("count_pattern4")), ), ui.hr(), ui.output_plot("pattern1_timeline_plot"), ui.hr(), ui.navset_tab( ui.nav_panel("Pattern 1 Table", ui.output_data_frame("table_pattern1")), ui.nav_panel("Pattern 2 Table", ui.output_data_frame("table_pattern2")), ui.nav_panel("Pattern 3 Table", ui.output_data_frame("table_pattern3")), ui.nav_panel("Pattern 4 Table", ui.output_data_frame("table_pattern4")), ), )
 
-    @output
-    @render.text
-    def count_pattern3():
-        return str(len(data()["pattern3"]))
+--- Server ---
 
-    @output
-    @render.text
-    def count_pattern4():
-        return str(len(data()["pattern4"]))
+def server(input, output, session): @reactive.calc() def raw_data(): return get_data()
 
-    @output
-    @render.data_frame
-    def table_pattern1():
-        return data()["pattern1"]
+@reactive.calc()
+def filtered_pattern1():
+    df = raw_data()["pattern1"]
+    if "StartTime" not in df:
+        return df
+    df["StartTime"] = pd.to_datetime(df["StartTime"], format="%Y%m%d%H%M%S", errors="coerce")
+    df = df.dropna(subset=["StartTime"])
+    start, end = input.date_range()
+    if start and end:
+        df = df[(df["StartTime"] >= pd.to_datetime(start)) & (df["StartTime"] <= pd.to_datetime(end))]
+    if input.process_filter() and "ProcessName" in df.columns:
+        df = df[df["ProcessName"] == input.process_filter()]
+    return df
 
-    @output
-    @render.data_frame
-    def table_pattern2():
-        return data()["pattern2"]
+@reactive.effect
+def update_process_list():
+    df = raw_data()["pattern1"]
+    if "ProcessName" in df.columns:
+        ui.update_select("process_filter", choices=[""] + sorted(df["ProcessName"].dropna().unique()))
 
-    @output
-    @render.data_frame
-    def table_pattern3():
-        return data()["pattern3"]
+@reactive.effect
+@reactive.timer(10)
+def auto_refresh():
+    raw_data.invalidate()
+    ping_status.invalidate()
 
-    @output
-    @render.data_frame
-    def table_pattern4():
-        return data()["pattern4"]
+@reactive.calc()
+def ping_status():
+    return [ping_host(ip) for ip in MONITOR_IPS]
 
-    @output
-    @render.plot
-    def pattern1_timeline_plot():
-        df = data()["pattern1"]
-        if "StartTime" not in df.columns:
-            fig, ax = plt.subplots()
-            ax.set_title("No StartTime column found in Pattern 1")
-            return fig
+@output
+@render.ui
+def network_status_panel():
+    results = ping_status()
+    all_up = all(results)
+    color = "green" if all_up else "red"
+    dot = f"<span style='font-size:48px;color:{color}'>●</span>"
+    return ui.HTML(f"<div style='text-align:center'><h4>Network Status</h4>{dot}</div>")
 
-        try:
-            df["StartTime"] = pd.to_datetime(df["StartTime"], format="%Y%m%d%H%M%S")
-        except:
-            df["StartTime"] = pd.to_datetime(df["StartTime"], errors="coerce")
+@output
+@render.text
+def count_pattern1():
+    return str(len(filtered_pattern1()))
 
-        df = df.dropna(subset=["StartTime"])
-        df["Hour"] = df["StartTime"].dt.floor("H")
-        summary = df.groupby("Hour").size().reset_index(name="Count")
+@output
+@render.text
+def count_pattern2():
+    return str(len(raw_data()["pattern2"]))
 
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.bar(summary["Hour"], summary["Count"])
-        ax.set_title("Pattern 1: Events per Hour")
-        ax.set_xlabel("Hour")
-        ax.set_ylabel("Count")
-        ax.tick_params(axis="x", rotation=45)
-        ax.grid(axis="y", linestyle="--", alpha=0.7)
-        plt.tight_layout()
+@output
+@render.text
+def count_pattern3():
+    return str(len(raw_data()["pattern3"]))
+
+@output
+@render.text
+def count_pattern4():
+    return str(len(raw_data()["pattern4"]))
+
+@output
+@render.data_frame
+def table_pattern1():
+    df = filtered_pattern1().copy()
+    if "Status" in df.columns:
+        df["Highlight"] = df["Status"].apply(lambda x: "⚠️" if str(x) not in ["0", "OK"] else "")
+    return df
+
+@output
+@render.data_frame
+def table_pattern2():
+    return raw_data()["pattern2"]
+
+@output
+@render.data_frame
+def table_pattern3():
+    return raw_data()["pattern3"]
+
+@output
+@render.data_frame
+def table_pattern4():
+    return raw_data()["pattern4"]
+
+@output
+@render.plot
+def pattern1_timeline_plot():
+    df = filtered_pattern1()
+    if df.empty:
+        fig, ax = plt.subplots()
+        ax.set_title("No events in range")
         return fig
-
+    df["Hour"] = df["StartTime"].dt.floor("H")
+    counts = df.groupby("Hour").size().reset_index(name="Count")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(counts["Hour"], counts["Count"])
+    ax.set_title("Pattern 1 Events per Hour")
+    ax.set_xlabel("Hour")
+    ax.set_ylabel("Count")
+    ax.tick_params(axis="x", rotation=45)
+    ax.grid(True, axis="y", linestyle="--", alpha=0.7)
+    plt.tight_layout()
+    return fig
 
 app = App(app_ui, server)
 
-if __name__ == "__main__":
-    app.run()
+if name == "main": app.run()
+
