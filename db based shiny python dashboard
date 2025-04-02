@@ -1,0 +1,118 @@
+from shiny import App, ui, render, reactive
+import pandas as pd
+import sqlite3
+import matplotlib.pyplot as plt
+import os
+
+DB_PATH = r"C:\Path\To\logs.db"  # update this path
+
+def get_data():
+    with sqlite3.connect(DB_PATH) as conn:
+        data = {
+            "pattern1": pd.read_sql("SELECT * FROM pattern1_entries", conn),
+            "pattern2": pd.read_sql("SELECT * FROM pattern2_entries", conn),
+            "pattern3": pd.read_sql("SELECT * FROM pattern3_entries", conn),
+            "pattern4": pd.read_sql("SELECT * FROM pattern4_entries", conn),
+        }
+    return data
+
+# App UI
+app_ui = ui.page_fluid(
+    ui.h2("Tecan Wallboard - Parsed Log Summary"),
+    ui.layout_columns(
+        ui.card(ui.h4("Pattern 1 Matches"), ui.output_text("count_pattern1")),
+        ui.card(ui.h4("Pattern 2 Matches"), ui.output_text("count_pattern2")),
+        ui.card(ui.h4("Pattern 3 Matches"), ui.output_text("count_pattern3")),
+        ui.card(ui.h4("Pattern 4 Matches"), ui.output_text("count_pattern4")),
+    ),
+    ui.hr(),
+    ui.output_plot("pattern1_timeline_plot"),
+    ui.hr(),
+    ui.navset_tab(
+        ui.nav_panel("Pattern 1 Table", ui.output_data_frame("table_pattern1")),
+        ui.nav_panel("Pattern 2 Table", ui.output_data_frame("table_pattern2")),
+        ui.nav_panel("Pattern 3 Table", ui.output_data_frame("table_pattern3")),
+        ui.nav_panel("Pattern 4 Table", ui.output_data_frame("table_pattern4")),
+    ),
+)
+
+
+# App logic
+def server(input, output, session):
+    @reactive.Calc
+    def data():
+        return get_data()
+
+    @output
+    @render.text
+    def count_pattern1():
+        return str(len(data()["pattern1"]))
+
+    @output
+    @render.text
+    def count_pattern2():
+        return str(len(data()["pattern2"]))
+
+    @output
+    @render.text
+    def count_pattern3():
+        return str(len(data()["pattern3"]))
+
+    @output
+    @render.text
+    def count_pattern4():
+        return str(len(data()["pattern4"]))
+
+    @output
+    @render.data_frame
+    def table_pattern1():
+        return data()["pattern1"]
+
+    @output
+    @render.data_frame
+    def table_pattern2():
+        return data()["pattern2"]
+
+    @output
+    @render.data_frame
+    def table_pattern3():
+        return data()["pattern3"]
+
+    @output
+    @render.data_frame
+    def table_pattern4():
+        return data()["pattern4"]
+
+    @output
+    @render.plot
+    def pattern1_timeline_plot():
+        df = data()["pattern1"]
+        if "StartTime" not in df.columns:
+            fig, ax = plt.subplots()
+            ax.set_title("No StartTime column found in Pattern 1")
+            return fig
+
+        try:
+            df["StartTime"] = pd.to_datetime(df["StartTime"], format="%Y%m%d%H%M%S")
+        except:
+            df["StartTime"] = pd.to_datetime(df["StartTime"], errors="coerce")
+
+        df = df.dropna(subset=["StartTime"])
+        df["Hour"] = df["StartTime"].dt.floor("H")
+        summary = df.groupby("Hour").size().reset_index(name="Count")
+
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.bar(summary["Hour"], summary["Count"])
+        ax.set_title("Pattern 1: Events per Hour")
+        ax.set_xlabel("Hour")
+        ax.set_ylabel("Count")
+        ax.tick_params(axis="x", rotation=45)
+        ax.grid(axis="y", linestyle="--", alpha=0.7)
+        plt.tight_layout()
+        return fig
+
+
+app = App(app_ui, server)
+
+if __name__ == "__main__":
+    app.run()
