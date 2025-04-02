@@ -1,0 +1,26 @@
+import sqlite3
+import pandas as pd
+import os
+
+base_path = r"C:\Path\To\temp_csv"
+db_path = r"C:\Path\To\logs.db"
+
+conn = sqlite3.connect(db_path)
+
+tables = {
+    "pattern1_entries": "pattern1.csv",
+    "pattern2_entries": "pattern2.csv",
+    "pattern3_entries": "pattern3.csv",
+    "pattern4_entries": "pattern4.csv",
+}
+
+for table, csv_file in tables.items():
+    csv_path = os.path.join(base_path, csv_file)
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path)
+        df.to_sql(table, conn, if_exists="replace", index=False)
+        print(f"Imported {table} from {csv_file}")
+    else:
+        print(f"File missing: {csv_path}")
+
+conn.close()
